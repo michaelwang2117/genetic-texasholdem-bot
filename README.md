@@ -9,16 +9,12 @@
 
 ## Run server (check the port 43535 is on your machine free to use first)
 python server.py
-Open http://localhost:43535
-
-
 
 ## Run GA evolver (in separate terminal)
-python -c "from ga_evolver import ga_loop; ga_loop()"
+python ga_evolver.py
 
-The GA will write the best genome to best_genome.pkl. The server reads GA stats via socket events (you can extend the GA to emit socket messages to the server).
-
-python -c "from ga_evolver import ga_loop; ga_loop()"
+## last step
+Open http://localhost:43535
 
 ## Remark
-This is a coding project inspired by poker game I played during my universities years in economics/B&F, stats and data science. This coding project has to be refined on frontend, i.e. not complete on frontend of game rendering during DNN training sessions - training sessions in terminal are working.
+This is a coding project inspired by poker game I played during my universities years in economics/B&F, stats and data science. This coding project has to be refined on frontend, i.e. not complete on frontend of game rendering during pytorch training sessions - training sessions in terminal are working.
