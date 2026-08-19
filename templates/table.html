@@ -1,0 +1,306 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Texas Hold'em – 9 Player Table</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      background: #0b0c10;
+      font-family: Arial, sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    #table {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 900px;
+      height: 600px;
+      transform: translate(-50%, -50%);
+    }
+
+    .felt {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 30% 30%, #1f8a4c, #0b4a2f);
+      border-radius: 50%;
+      border: 12px solid #5b3a1a;
+      position: absolute;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    }
+
+    .community {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      gap: 10px;
+    }
+
+    .card {
+      width: 60px;
+      height: 90px;
+      background: #fff;
+      border-radius: 8px;
+      border: 2px solid #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      color: #000;
+    }
+
+    .back {
+      background: linear-gradient(135deg, #1b2836, #30415d);
+      border-color: #111;
+    }
+
+    .player {
+      position: absolute;
+      width: 140px;
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .player img {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      margin-bottom: 4px;
+    }
+
+    .player-name {
+      font-weight: 600;
+    }
+
+    .player-stack {
+      color: #ffd700;
+    }
+
+    .player-cards {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .player .card {
+      width: 40px;
+      height: 60px;
+    }
+
+    .dealer {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      background: #ffd700;
+      color: #000;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: bold;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 0 8px rgba(0,0,0,0.7);
+    }
+
+    #pot {
+      position: absolute;
+      top: calc(50% + 90px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 20px;
+      color: #ffd700;
+    }
+
+    #phase {
+      position: absolute;
+      top: calc(50% + 120px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: #ccc;
+    }
+
+    #stats {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      font-size: 14px;
+    }
+
+    #hof {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      width: 320px;
+      background: rgba(255,255,255,0.05);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+
+    #hof h3, #hof h4 {
+      margin: 4px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    td, th {
+      border: 1px solid #666;
+      padding: 3px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div id="table">
+  <div class="felt"></div>
+  <div id="community" class="community"></div>
+  <div id="pot">Pot: 0</div>
+  <div id="phase">Phase: waiting</div>
+</div>
+
+<div id="stats">
+  Generation: <span id="gen">0</span><br>
+  Best Fitness: <span id="fitness">0.0000</span>
+</div>
+
+<div id="hof">
+  <h3>Hall of Fame</h3>
+  <div id="hof-list"></div>
+  <h4>Head‑to‑Head Matrix</h4>
+  <div id="hof-matrix"></div>
+</div>
+
+<script>
+  const socket = io();
+
+  // Seat positions around the table (matching NUM_PLAYERS = 9)
+  const SEATS = [
+    { top: 20,  left: 380 },  // 0
+    { top: 80,  left: 120 },  // 1
+    { top: 200, left: 40  },  // 2
+    { top: 330, left: 120 },  // 3
+    { top: 430, left: 380 },  // 4
+    { top: 330, left: 640 },  // 5
+    { top: 200, left: 720 },  // 6
+    { top: 80,  left: 640 },  // 7
+    { top: 20,  left: 380 }   // 8 (top again, opposite side)
+  ];
+
+  function renderPlayers(players, dealerPos, holeCards) {
+    const table = document.getElementById("table");
+
+    // Clear previous players and dealer buttons
+    document.querySelectorAll(".player").forEach(el => el.remove());
+    document.querySelectorAll(".dealer").forEach(el => el.remove());
+
+    players.forEach(p => {
+      const seat = SEATS[p.seat % SEATS.length];
+
+      const div = document.createElement("div");
+      div.className = "player";
+      div.style.top = seat.top + "px";
+      div.style.left = seat.left + "px";
+
+      const cards = holeCards[p.id] || [];
+      const cardsHtml = cards.length
+        ? cards.map(c => `<div class="card">${c}</div>`).join("")
+        : `<div class="card back"></div><div class="card back"></div>`;
+
+      div.innerHTML = `
+        <img src="${p.avatar}">
+        <div class="player-name">P${p.id}</div>
+        <div class="player-stack">$${p.stack}</div>
+        <div class="player-cards">${cardsHtml}</div>
+      `;
+
+      table.appendChild(div);
+
+      if (p.seat === dealerPos) {
+        const d = document.createElement("div");
+        d.className = "dealer";
+        d.style.top = (seat.top + 60) + "px";
+        d.style.left = (seat.left + 100) + "px";
+        d.style.display = "flex";
+        d.textContent = "D";
+        table.appendChild(d);
+      }
+    });
+  }
+
+  function renderBoard(boardCards) {
+    const div = document.getElementById("community");
+    div.innerHTML = "";
+
+    boardCards.forEach(c => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.textContent = c;
+      div.appendChild(card);
+    });
+
+    for (let i = boardCards.length; i < 5; i++) {
+      const card = document.createElement("div");
+      card.className = "card back";
+      div.appendChild(card);
+    }
+  }
+
+  function renderHOF(hof) {
+    const list = document.getElementById("hof-list");
+    const matrixDiv = document.getElementById("hof-matrix");
+
+    list.innerHTML = hof.labels.map(l => `<div>${l}</div>`).join("");
+
+    if (!hof.matrix || hof.matrix.length === 0) {
+      matrixDiv.innerHTML = "<i>No HOF entries yet</i>";
+      return;
+    }
+
+    let html = "<table><tr><th></th>";
+    hof.labels.forEach(l => html += `<th>${l}</th>`);
+    html += "</tr>";
+
+    hof.matrix.forEach((row, i) => {
+      html += `<tr><th>${hof.labels[i]}</th>`;
+      row.forEach(v => html += `<td>${v.toFixed(2)}</td>`);
+      html += "</tr>";
+    });
+
+    html += "</table>";
+    matrixDiv.innerHTML = html;
+  }
+
+  socket.on("table_update", state => {
+    renderPlayers(state.players, state.dealer_pos, state.hole_cards);
+    renderBoard(state.board_cards);
+
+    document.getElementById("pot").textContent = "Pot: " + state.pot;
+    document.getElementById("phase").textContent = "Phase: " + state.phase;
+    document.getElementById("gen").textContent = state.generation;
+    document.getElementById("fitness").textContent = Number(state.best_fitness).toFixed(4);
+  });
+
+  socket.on("hof_update", hof => {
+    renderHOF(hof);
+  });
+</script>
+
+</body>
+</html>
