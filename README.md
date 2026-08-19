@@ -17,4 +17,6 @@ python ga_evolver.py
 Open http://localhost:43535
 
 ## Remark
-This is a coding project inspired by poker game I played during my universities years in economics/B&F, stats and data science. This coding project has to be refined on frontend, i.e. not complete on frontend of game rendering during pytorch training sessions - training sessions in terminal are working normally.
+- This is a coding project inspired by poker game I played during my universities years in economics/B&F, stats and data science. This coding project has to be refined on frontend, i.e. not complete on frontend of game rendering during pytorch training sessions - training sessions in terminal are working normally.
+  
+- The idea is based on genetic evolutionary progress - the selector choose by each round of training the winner bot, let this bot reproduce, then selective process applied again, an iterative process of winner of previous generations.  
